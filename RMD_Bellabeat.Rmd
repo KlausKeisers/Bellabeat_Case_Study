@@ -1,0 +1,351 @@
+---
+title: "Notebook Bellabeat Case Study"
+author: "Klaus Keisers"
+date: '2022-03-31'
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Bellabeat Case Study
+
+**Case Study 2:** How Can a Wellness Technology Company Play It Smart?
+
+Author: Klaus Keisers
+
+**Intro**
+
+In this case study, I am a junior data analyst who is working for the marketing analytics team at Bellabeat, a high-tech company that designs health tracking products for women. This hypothetical scenario is provided by Google's Data Analytics Certificate Program through Coursera, and I will be outlining the standard data analysis pathway throughout this project (ask, prepare, process, analyze, share, and act).
+
+**Contents:**
+
+1. Ask
+
+2. Prepare
+
+3. Process
+
+4. Analyze
+
+5. Share
+
+6. Act
+
+### 1. Ask:
+
+*Business Task:*
+
+Analyzing data from smart devices outside of your company to gain information that helps the company to unlock new growth opportunities.
+
+*Stakeholders:*
+
+•	Urska Srsen: Chief Creative Officer and Cofounder
+
+•	Sando Mur: Key Member of the Bellabeat executive team
+
+•	Bellabeat marketing team: Team of data analyst
+
+### 2. Prepare:
+
+The data is public data from FitBit Fitness Tracker Data. It's a dataset from thirty fitbit users that includes minute-level output for physical activity, heart rate, and sleep monitoring. It's a good database segmented in several tables with different aspects of the data of the device with lots of details about the user behaviour.
+
+I am going to focus on daily patterns like Activity, Calories, Intensities and Steps. So I am using just the tables who are representing this kind of data. 
+
+
+```{r 1}
+##installing and running the needed packages for this caase study
+install.packages("tidyverse")
+library(tidyverse)
+library(ggplot2)
+library(readr)
+```
+
+
+```{r 2}
+##importing the needed dataset to see daily patterns
+daily_activity <- read_csv("/cloud/project/Bellabeat_Case_Study/dailyActivity_merged.csv")
+daily_calories <- read_csv("/cloud/project/Bellabeat_Case_Study/dailyCalories_merged.csv")
+daily_intensities <- read_csv("/cloud/project/Bellabeat_Case_Study/dailyIntensities_merged.csv")
+daily_steps <- read_csv("/cloud/project/Bellabeat_Case_Study/dailySteps_merged.csv")
+sleep <- read_csv("/cloud/project/Bellabeat_Case_Study/sleepDay_merged.csv")
+weight_log <- read_csv("/cloud/project/Bellabeat_Case_Study/weightLogInfo_merged.csv")
+```
+```{r 3}
+##preview of the datasets
+head(daily_activity)
+head(daily_calories)
+head(daily_intensities)
+head(daily_steps)
+head(weight_log)
+head(sleep)
+```
+**Credibility**
+
+I will be using the ROCCC framework to demonstrate the credibility.
+
+*Reliable* - The dataset contains secondary data collected via a distributed survey by Amazon Mechanical Turk
+
+*Original* - It is a public data set. So it is not original.
+
+*Comprehensive* - There ere only 30 probands. So its unlikely that it covers a wide range of different variables.
+
+*Current* - The data was collected between 03.12.2016 - 05.12.2016.
+
+*Cited* - I didnt find any information whether these work has been cited alot.
+
+
+### 3.Process:
+
+*Checking the Data for Errors and Cleaning the Data*
+
+-Duplicated data
+
+-Irrelevant data
+
+-Inconsistensies in the number of rows
+
+-Inconsistensies in the number of participants
+
+-NULL values
+
+-Missing values
+
+*Duplicated data:*
+```{r 4}
+##removing all duplicated data
+daily_activity<-daily_activity[!duplicated(daily_activity),]
+daily_calories<-daily_calories[!duplicated(daily_calories),]
+daily_intensities<-daily_intensities[!duplicated(daily_intensities),]
+daily_steps<-daily_steps[!duplicated(daily_steps),]
+sleep<-sleep[!duplicated(sleep),]
+weight_log<-weight_log[!duplicated(weight_log),]
+
+##Checking how many rows were removed
+sum(duplicated(daily_activity))
+sum(duplicated(daily_calories))
+sum(duplicated(daily_intensities))
+sum(duplicated(daily_steps))
+sum(duplicated(sleep))
+sum(duplicated(weight_log))
+```
+*Irrelevant Data*
+```{r}
+## removing daytime from the data just leaving the date
+updated_sleep_table <- sleep %>% 
+    separate(SleepDay, c("Date", "Time"), " ")
+updated_weight_log <- weight_log %>% 
+    separate(Date, c("Date", "Time"), " ")
+new_sleep_table <- subset(updated_sleep_table, select = -c(Time))
+new_weight_log <- subset(updated_weight_log, select = -c(Time))
+```
+
+*Inconsistensies in the number of rows*
+```{r}
+## Looking for Inconsistensies in the number of rows
+nrow(daily_activity)
+nrow(daily_calories)
+nrow(daily_intensities)
+nrow(daily_steps)
+nrow(new_sleep_table)
+nrow(new_weight_log)
+```
+
+It seems like that 940 rows is the ideal or "normal" Number of Rows. At the sleep and weight table there are missing some rows. These 2 Tables are not completely accurate.
+
+*Inconsistensies in the number of participants*
+```{r}
+daily_activity$Id %>% n_distinct()
+daily_calories$Id %>% n_distinct()
+daily_intensities$Id %>% n_distinct()
+daily_steps$Id %>% n_distinct()
+new_sleep_table$Id %>% n_distinct()
+new_weight_log$Id %>% n_distinct()
+```
+The  number of probands differs in the different tables. The are supposed to be 30 participants in the data. Now it seems that there usually 33.Just the wheight_log and the sleeping_table are missing some participants. 
+
+*Null Values*
+```{r}
+is.null(daily_activity)
+is.null(daily_calories)
+is.null(daily_steps)
+is.null(daily_intensities)
+is.null(new_sleep_table)
+is.null(new_weight_log)
+```
+*Missing values*
+```{r}
+sum(is.na(daily_activity))
+sum(is.na(daily_calories))
+sum(is.na(daily_intensities))
+sum(is.na(daily_steps))
+sum(is.na(new_sleep_table))
+sum(is.na(new_weight_log))
+```
+There are missing values in the weight log in the "Fat" Column. Because of so many missing values it is invalid so i am going to remove the Fat Column from the table.
+
+```{r}
+##Removing the Fat Column and changing the name of the sleeping_log
+weight_log <- subset(new_weight_log, Select = -c(Fat))
+sleep_log <- new_sleep_table
+```
+
+
+### 4. Analyze:
+
+*Summarizing data*
+```{r}
+sapply(list(daily_activity, daily_calories, daily_intensities, daily_steps, sleep_log, weight_log),summary)
+```
+**Most important Activity Data:**
+
+*1. Calories:*
+
+-Avg: 2304 Calories
+
+-Max: 4900 Calories
+
+*2. Intensities:*
+
+-Avg of Very Active Minutes: 21.16
+ 
+-Avg of Fairly Active Minutes: 13.56
+  
+-Avg of Lightly Active Minutes: 199.0
+
+-Avg of Sedentary Active Minutes: 991.2
+
+*3. Steps:*
+
+-Avg: 7638 Steps
+
+*4. Sleep*
+
+-Total Minutes Asleep Avg: 419.2
+
+-Total Time In Bed Avg: 458.5
+
+*5. Weight*
+
+-Average of Weight in kg: 72.04
+
+-Average of BMI: 25.19
+
+### 5. Share
+
+Steps vs. Weight
+
+Steps vs. Calories
+
+Intensities vs. Calories
+
+Steps vs. Sleep
+
+Time taken to fall Asleep
+
+
+**Sleep vs. Weight**
+
+I want to see if there some Correlation between these topics. For example I want to see if it makes a difference how many steps a person took and how many minutes he slept. 
+
+```{r}
+## library dplr for JOIN Function, so that I can combine tables
+library(dplyr)
+steps_vs_weight <- daily_steps %>% inner_join(weight_log,by="Id")
+print(steps_vs_weight)
+steps_vs_weight_graphic <- ggplot(data=steps_vs_weight) +
+  geom_smooth(mapping = aes(x = WeightKg, y = StepTotal))
+print(steps_vs_weight_graphic)
+```
+
+There is no obvious Correlation between Weight of the Person and the Step Total he took during the testing time.
+
+**Steps vs. Calories**
+
+```{r}
+library(ggplot2)
+
+ggplot(data=daily_activity) +
+  geom_jitter(width= .5, size=1, mapping = aes(x = TotalSteps, y = Calories))+
+  geom_smooth(mapping = aes(x = TotalSteps, y = Calories))+
+  labs(x="Total Number of Steps", y="Calories burnt",title = "Relation betwenn Calories burnt and Steps walked")
+```
+
+There is a correlation between the Number of Steps someone walked and how much Calories he burnt. This can be used to show the customer that tracking your steps can help you to burn more Calories. 
+
+**Intensities vs Calories:**
+```{r}
+## install new package to show different graph side by side
+install.packages("patchwork")
+library(patchwork)
+
+VeryActiveMinutes_graph <- ggplot(data=daily_activity) +
+  geom_jitter(mapping = aes(x = Calories, y = VeryActiveMinutes))+
+  geom_smooth(mapping = aes(x = Calories, y = VeryActiveMinutes))
+
+FairlyActiveMinutes_graph <- ggplot(data=daily_activity) +
+  geom_jitter(mapping = aes(x = Calories, y = FairlyActiveMinutes))+
+  geom_smooth(mapping = aes(x = Calories, y = FairlyActiveMinutes))
+
+LightlyActiveMinutes_graph <- ggplot(data=daily_activity) +
+  geom_jitter(mapping = aes(x = Calories, y = LightlyActiveMinutes))+
+  geom_smooth(mapping = aes(x = Calories, y = LightlyActiveMinutes))
+
+SedentaryMinutes_graph <- ggplot(data=daily_activity) +
+  geom_jitter(mapping = aes(x = Calories, y = SedentaryMinutes))+
+  geom_smooth(mapping = aes(x = Calories, y = SedentaryMinutes))
+
+VeryActiveMinutes_graph + FairlyActiveMinutes_graph + LightlyActiveMinutes_graph + SedentaryMinutes_graph
+```
+
+The Data outcome is as expected. If you have more active Minutes it is more likely that you burnt more Calories.
+
+
+**Steps vs Sleep**
+```{r}
+steps_vs_sleep <- daily_steps %>% inner_join(sleep_log,by="Id")
+steps_vs_sleep_graph <- ggplot(data=steps_vs_sleep) +
+  geom_jitter(mapping = aes(x = StepTotal, y = TotalMinutesAsleep))+
+  geom_smooth(mapping = aes(x = StepTotal, y = TotalMinutesAsleep))
+print(steps_vs_sleep_graph)
+```
+
+There seems to be  no effect from the Steps someone took and the Minutes of Sleep he got. 
+
+**Time taken to fall Asleep**
+```{r}
+updated_sleep_log <- sleep_log %>% mutate(time_taken_to_sleep = TotalTimeInBed-TotalMinutesAsleep)
+Time_Falling_Asleep_Graph <- ggplot(data=updated_sleep_log, mapping = aes(x= time_taken_to_sleep))+
+  geom_area(stat = "bin", bins= 30)+
+  labs(x="Time to Fall Asleep", y= "Number of Nights", title = "Time to Fall Asleep")
+
+inbed_vs_asleep_graph <- ggplot(data = updated_sleep_log, mapping = aes(x = TotalTimeInBed, y = TotalMinutesAsleep))+
+  geom_point(mapping = aes(x = TotalTimeInBed, y = TotalMinutesAsleep))+
+  geom_smooth(mapping = aes(x = TotalTimeInBed, y = TotalMinutesAsleep))+
+  labs(x="Total Time in Bed", y= "Total Minutes Asleep", title = "Relation between Bed and Sleep")
+
+Time_Falling_Asleep_Graph + inbed_vs_asleep_graph
+```
+
+Usually the Probands dont need more than ca. 75 Minutes to fall asleep.
+
+If you stay longer in Bed you will also sleep longer. Besides you stay longer than 700 Minutes. Then the Amount of Sleep you will get will decline. 
+
+### 6. Act:
+
+Summary of the relevant gained information:
+
+- Not very suprising is that if someone takes more steps or has more active Minutes he burns more Calories.
+
+- The Correlation between Very Active Minutes and Calories burnt seems to be very strong. If you have 50 Minutes of very Active Minutes its likely that  you burn more than 3000 Calories
+
+- The Steps someone took during the day doesnt have any Effect on his Sleep
+
+**Growth Opportunities:**
+
+- Help Customers to integrate a short amount of Time, where they are going to be high active, in there daylife. If they get more high active minutes into their daily life, they will burn more Calories.
+
+- Encourage Customers to walk more during the day. More Steps -> More Calories burnt. 
